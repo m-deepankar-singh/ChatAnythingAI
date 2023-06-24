@@ -4,17 +4,12 @@ A complete UI for an OpenAI powered Chatbot inspired by [https://www.ai.com](htt
 
 It makes use of Nextjs streaming responses from the edge. Langchain is used to manage the chat history and calls to OpenAI's chat completion. It uses a basic `BufferMemory` as Memory.
 
-![alt text](https://user-images.githubusercontent.com/9072277/236784050-ddc47a89-f30b-46cc-a773-77798ec918c4.gif)
+The backend is built with Flask, a popular Python web framework. It handles various document types (like PDF, CSV, DOCX, TXT, etc.), URLs, Git repositories, and YouTube videos. The backend also interfaces with the Pinecone vector database.
 
-This is part 3 of a Langchain+Nextjs series:
-
-Part 1: https://github.com/DennisKo/langchain-1-nextjs-stream
-
-Part 2: https://github.com/DennisKo/langchain-2-emojify
 
 Disclaimer: The code in this series is not meant for production or be taken as an example for best practices. It is meant to be be a starting point and conceptual example of how to implement those kind of technologies. There are bugs and no tests! You have been warned! ;)
 
-## Getting Started!
+## Frontend
 
 
 First, run the development server:
@@ -32,6 +27,17 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+
+## Backend
+The backend uses Flask and should be run separately. Before running the backend, make sure to install all dependencies and setup your environment variables, such as AZURE_STORAGE_CONNECTION_STRING, CONTAINER_NAME, PINECONE_API_KEY, PINECONE_ENV.
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the backend
+python app.py
+```
 
 ## Learn More
 

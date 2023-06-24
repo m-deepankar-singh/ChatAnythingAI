@@ -1,0 +1,10 @@
+pinecone-client
+langchain
+python-dotenv
+pypdf
+azure-storage-blob
+docx2txt
+flask
+flask-cors
+youtube-transcript-api
+openai

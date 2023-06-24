@@ -13,7 +13,6 @@ from langchain.document_loaders import YoutubeLoader
 import glob
 import pinecone
 from langchain.vectorstores import Pinecone
-from langchain.document_loaders import DataFrameLoader
 from dotenv import load_dotenv
 from langchain.document_loaders import TextLoader
 from langchain.document_loaders import AzureBlobStorageContainerLoader
