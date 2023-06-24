@@ -147,7 +147,7 @@ export default function Home() {
         dispatch({ type: "addMessage", payload: { prompt, controller } });
         promptInput.current.value = "";
 
-        const res = await fetch("http://localhost:3000/api/chat", {
+        const res = await fetch("https://chat-anything-ai.vercel.app/api/chat", {
           method: "POST",
           body: JSON.stringify({ messages: state.messages, prompt }),
           signal: signal,
