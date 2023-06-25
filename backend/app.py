@@ -265,35 +265,39 @@ def process_git():
 
     all_pages = []
 
-    # Check if "repo" directory exists, and create it if not
-    repo_path = "repo"
-    if not os.path.exists(repo_path):
-        os.makedirs(repo_path)
+    # Create a temporary directory
+    with tempfile.TemporaryDirectory() as repo_path:
+        # Load pages from URLs
+        loader = GitLoader(clone_url=git_url, repo_path=repo_path, branch="main")
+        text_splitter = RecursiveCharacterTextSplitter()
+        url_pages = loader.load_and_split(text_splitter=text_splitter)
+        all_pages.extend(url_pages)
 
-    # Load pages from URLs
-    loader = GitLoader(clone_url=git_url, repo_path=repo_path, branch="main")
-    text_splitter = RecursiveCharacterTextSplitter()
-    url_pages = loader.load_and_split(text_splitter=text_splitter)
-    all_pages.extend(url_pages)
+        # Get Blob service client
+        blob_service_client = BlobServiceClient.from_connection_string(connection_string)
 
-    embeddings = OpenAIEmbeddings()
-    if index_name not in pinecone.list_indexes(): 
-        # we create a new index
-        pinecone.create_index(
-            name=index_name,
-            metric='cosine',
-            dimension=1536  # 1536 dim of text-embedding-ada-002
-        ) 
-    Pinecone.from_documents(all_pages, embedding=embeddings, index_name=index_name)
+        # Name of the Blob container in your storage
+        container_name = container
 
-# Empty the repo directory
-    for root, dirs, files in os.walk(repo_path, topdown=False):
-        for name in files:
-            os.chmod(os.path.join(root, name), 0o777)
-            os.unlink(os.path.join(root, name))
-        for name in dirs:
-            os.chmod(os.path.join(root, name), 0o777)
-            os.rmdir(os.path.join(root, name))
+        # Upload repo directory to Blob storage
+        for root, dirs, files in os.walk(repo_path, topdown=False):
+            for name in files:
+                file_path = os.path.join(root, name)
+                blob_client = blob_service_client.get_blob_client(container_name, file_path)
+                with open(file_path, "rb") as data:
+                    blob_client.upload_blob(data)
+
+        embeddings = OpenAIEmbeddings()
+        if index_name not in pinecone.list_indexes(): 
+            # we create a new index
+            pinecone.create_index(
+                name=index_name,
+                metric='cosine',
+                dimension=1536  # 1536 dim of text-embedding-ada-002
+            ) 
+        Pinecone.from_documents(all_pages, embedding=embeddings, index_name=index_name)
+
+    # No need to manually delete files in the temporary directory, as it gets removed automatically
 
     return jsonify({'message': 'Git URL processed successfully'}), 200
 
@@ -337,4 +341,4 @@ def delete_index():
 
 
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=True)
