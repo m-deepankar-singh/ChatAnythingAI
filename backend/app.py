@@ -239,7 +239,7 @@ def process_urls():
 
     # Load pages from URLs
     loader = WebBaseLoader(web_path=urls)
-    loader.requests_kwargs = {'verify':True}
+    # loader.requests_kwargs = {'verify':True}
     url_pages = loader.load_and_split()
     all_pages.extend(url_pages)
 

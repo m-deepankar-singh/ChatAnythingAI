@@ -11,3 +11,5 @@ openai
 gunicorn
 beautifulsoup4
 tiktoken
+GitPython
+pytube
