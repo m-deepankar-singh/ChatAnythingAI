@@ -110,6 +110,7 @@ def process_files():
     blob_list = container_client.list_blobs()
     for blob in blob_list:
         blob_client = container_client.get_blob_client(blob)
+        container_client = blob_service_client.get_container_client(container)
         download_file_path = os.path.join(temp_dir, blob.name)
         with open(download_file_path, "wb") as download_file:
             download_file.write(blob_client.download_blob().readall())
@@ -158,10 +159,14 @@ def process_files():
     ) 
     Pinecone.from_documents(all_pages, embedding=embeddings,index_name=index_name)
 
-    for blob in blob_list:
-        blob_client = container_client.get_blob_client(blob)
-        blob_client.delete_blob()
+    blobList=[*container_client.list_blobs()]
+    while len(blobList) > 0:
+        first256 = blobList[0:255]
+        print("deleting " + str(len(first256)) + " of " + str(len(blobList)) + " blobs.")
+        container_client.delete_blobs(*first256)     # delete_blobs() is faster!
+        del blobList[0:255]
 
+        
     # Remove the temporary directory
     shutil.rmtree(temp_dir)    
     return jsonify({'message': 'files processed successfully'}), 200
@@ -332,4 +337,4 @@ def delete_index():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()

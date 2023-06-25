@@ -8,3 +8,4 @@ flask
 flask-cors
 youtube-transcript-api
 openai
+gunicorn
