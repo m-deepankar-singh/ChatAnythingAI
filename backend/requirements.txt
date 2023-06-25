@@ -10,3 +10,4 @@ youtube-transcript-api
 openai
 gunicorn
 beautifulsoup4
+tiktoken
