@@ -14,7 +14,7 @@ export const YTProcessor: FC = () => {
   const processYTUrl = async () => {
     setLoading(true);
     try {
-      const response = await axios.post("http://localhost:5000/youtube", { urls: ytUrl });
+      const response = await axios.post("https://chatany.onrender.com/youtube", { urls: ytUrl });
       console.log(response.data);
       setIsProcessed(true);
     } catch (error) {

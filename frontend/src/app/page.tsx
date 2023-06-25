@@ -130,7 +130,7 @@ export default function Home() {
 
   const handleDeleteContext = async () => {
     try {
-      await axios.delete("http://localhost:5000/delete");
+      await axios.delete("https://chatany.onrender.com/delete");
       alert("Context deleted successfully");
       window.location.reload();
     } catch (error) {
@@ -230,7 +230,7 @@ export default function Home() {
               </button>
             </div>
           )}
-          <div className="flex space-x-24 ">
+          <div className="flex space-x-4 ">
             <button
               onClick={openModal}
               className="rounded mb-4 bg-indigo-50 py-1 px-2 text-sm font-semibold text-indigo-600 shadow-sm hover:bg-indigo-100"
@@ -243,12 +243,12 @@ export default function Home() {
             >
               Add URLs
             </button>
-            <button
+            {/* <button
               onClick={openGitProcessorModal}
               className="rounded mb-4 bg-indigo-50 py-1 px-2 text-sm font-semibold text-indigo-600 shadow-sm hover:bg-indigo-100"
             >
               Add GitHub Repo
-            </button>
+            </button> */}
             <button
               onClick={openYTProcessorModal}
               className="rounded mb-4 bg-indigo-50 py-1 px-2 text-sm font-semibold text-indigo-600 shadow-sm hover:bg-indigo-100"

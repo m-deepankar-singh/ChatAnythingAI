@@ -14,7 +14,7 @@ export const GitProcessor: FC = () => {
   const processGitUrl = async () => {
     setLoading(true);
     try {
-      const response = await axios.post("http://localhost:5000/git", { git_url: gitUrl });
+      const response = await axios.post("https://chatany.onrender.com/:5000/git", { git_url: gitUrl });
       console.log(response.data);
       setIsProcessed(true);
     } catch (error) {
