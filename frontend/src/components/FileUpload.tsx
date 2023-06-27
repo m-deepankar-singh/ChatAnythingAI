@@ -26,7 +26,7 @@ export default function FileUpload() {
 
     try {
       const response = await axios.post(
-        "https://chatany.onrender.com/uploadFile",
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/uploadFile`,
         data
       );
       console.log(response.data);

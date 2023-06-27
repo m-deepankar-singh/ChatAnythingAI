@@ -23,7 +23,7 @@ export default function URLProcessor() {
     setLoading(true);
     setIsProcessing(true);
     try {
-      const response = await axios.post("https://chatany.onrender.com/url", {
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_URL}/url`, {
         urls: urlEntries,
       });
       console.log(response.data);

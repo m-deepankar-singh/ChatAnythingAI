@@ -19,11 +19,7 @@ import { PineconeClient } from "@pinecone-database/pinecone";
 import { PineconeStore } from "langchain/vectorstores/pinecone";
 import { OpenAIEmbeddings } from "langchain/embeddings/openai";
 
-interface LangChainRequestBody {
-  question: string;
-  chat_history?: string[];
-  apiKey: string;
-}
+
 
 export const runtime = "edge";
 
@@ -47,19 +43,15 @@ function mapStoredMessagesToChatMessages(
 export async function POST(req: Request) {
   const body = await req.json();
   const question = body.prompt;
-  const messages = [
-    { name: "human", text: "You are a friendly assistant who give replies to my queries like the rapper eminem" },
-    ...body.messages,
-  ];
-
-
+  const messages = body.messages;
+  const model = body.model;
   const encoder = new TextEncoder();
   const stream = new TransformStream();
   const writer = stream.writable.getWriter();
   let counter = 0;
   let string = "";
   const chat = new ChatOpenAI({
-    modelName: "gpt-4",
+    modelName: model,
     temperature: 0,
     streaming: true,
     maxRetries: 1,

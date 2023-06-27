@@ -118,6 +118,8 @@ export default function Home() {
   const openYTProcessorModal = () => setIsYTProcessorModalOpen(true);
   const closeYTProcessorModal = () => setIsYTProcessorModalOpen(false);
 
+  const [model, setModel] = useState("gpt-3.5-turbo");
+  const [isModelSelectDisabled, setIsModelSelectDisabled] = useState(false);
 
   const [state, dispatch] = useReducer(reducer, {
     messages: [],
@@ -130,7 +132,7 @@ export default function Home() {
 
   const handleDeleteContext = async () => {
     try {
-      await axios.delete("https://chatany.onrender.com/delete");
+      await axios.delete(`${process.env.NEXT_PUBLIC_BACKEND_URL}/delete`);
       alert("Context deleted successfully");
       window.location.reload();
     } catch (error) {
@@ -147,9 +149,11 @@ export default function Home() {
         dispatch({ type: "addMessage", payload: { prompt, controller } });
         promptInput.current.value = "";
 
-        const res = await fetch("https://chat-anything-ai.vercel.app/api/chat", {
+        setIsModelSelectDisabled(true);
+
+        const res = await fetch(`/api/chat`, {
           method: "POST",
-          body: JSON.stringify({ messages: state.messages, prompt }),
+          body: JSON.stringify({ messages: state.messages, prompt, model }),
           signal: signal,
         });
         const data = res.body;
@@ -204,6 +208,18 @@ export default function Home() {
           >
             <div className="w-full transition-width flex flex-col items-stretch flex-1">
               <div className="flex-1">
+                <div className="flex items-start py-8  justify-center">
+                  <select
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    className="rounded w-64 bg-indigo-50 text-indigo-600 py-1 px-2 text-sm font-semibold shadow-sm hover:bg-gray-100"
+                    disabled={isModelSelectDisabled}
+                  >
+                    <option value="gpt-3.5-turbo">GPT-3.5-Turbo</option>
+                    <option value="gpt-4">GPT-4</option>
+                  </select>
+                </div>
+
                 <div className="flex flex-col prose prose-lg prose-invert">
                   {state.messages.map((message, i) => (
                     <Message
@@ -223,7 +239,7 @@ export default function Home() {
             <div className="flex mx-auto justify-center mb-2">
               <button
                 type="button"
-                className="rounded mb-2 bg-indigo-50 py-1 px-2 text-sm font-semibold text-indigo-600 shadow-sm hover:bg-indigo-100"
+                className="rounded mb-4 bg-indigo-50 py-1 px-2 text-sm font-semibold text-indigo-600 shadow-sm hover:bg-indigo-100"
                 onClick={handleAbort}
               >
                 Stop generating
