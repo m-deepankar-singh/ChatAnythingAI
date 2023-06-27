@@ -41,7 +41,7 @@ export default function FileUpload() {
     setLoading(true);
     setIsProcessing(true);
     try {
-      const response = await axios.get("http://localhost:5000/process");
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/process`);
       console.log(response.data);
     } catch (error) {
       console.log(error);
