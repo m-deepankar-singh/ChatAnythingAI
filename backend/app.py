@@ -17,7 +17,6 @@ import pinecone
 from langchain.vectorstores import Pinecone
 from dotenv import load_dotenv
 from langchain.document_loaders import TextLoader
-from langchain.document_loaders import AzureBlobStorageContainerLoader
 from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
 from azure.core.exceptions import AzureError
 load_dotenv()
@@ -39,34 +38,6 @@ pinecone.init(
 
 
 
-# @app.route("/uploadFile", methods=["POST"])
-# def upload_file():
-#     if 'files[]' not in request.files:
-#         return "Please send a POST request with files", 400
-
-#     filenames = []
-#     try:
-#         uploaded_files = request.files.getlist("files[]")
-#         for file in uploaded_files:
-#             filename = secure_filename(file.filename)
-            
-#             # Ensure the 'documents' directory exists
-#             if not os.path.exists('documents'):
-#                 os.makedirs('documents')
-
-#             filepath = os.path.join('documents', filename)
-#             file.save(filepath)
-#             filenames.append(filename)
-
-#     except Exception as e:
-#         # cleanup temp files
-#         for file in filenames:
-#             filepath = os.path.join('documents', file)
-#             if os.path.exists(filepath):
-#                 os.remove(filepath)
-#         return jsonify({"error": str(e)}), 500
-
-#     return jsonify(filenames), 200
 
 @app.route("/uploadFile", methods=["POST"])
 def upload_file():
@@ -121,13 +92,14 @@ def process_files():
     if not all_files:
         return jsonify({"error": "No files found in the documents directory"}), 400
 
+
     all_pages = []
     for file_path in all_files:
         file_extension = os.path.splitext(file_path)[-1].lower()
-
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000,chunk_overlap=200)
         if file_extension == '.pdf':
             loader = PyPDFLoader(file_path)
-            pages = loader.load_and_split()
+            pages = loader.load_and_split(text_splitter=text_splitter)
             all_pages.extend(pages)
 
         elif file_extension == '.csv':
@@ -172,57 +144,6 @@ def process_files():
     return jsonify({'message': 'files processed successfully'}), 200
 
 
-
-
-# @app.route('/process', methods=['GET'])
-# def process_files():
-#     all_files = glob.glob("documents/*")
-
-#     if not all_files:
-#         return jsonify({"error": "No files found in the documents directory"}), 400
-
-#     all_pages = []
-#     for file_path in all_files:
-#         file_extension = os.path.splitext(file_path)[-1].lower()
-
-#         if file_extension == '.pdf':
-#             loader = PyPDFLoader(file_path)
-#             pages = loader.load_and_split()
-#             all_pages.extend(pages)
-
-#         elif file_extension == '.csv':
-#             try:
-#                 loader = CSVLoader(file_path=file_path, encoding="utf-8")
-#                 all_pages = loader.load_and_split()
-#             except:
-#                 loader = CSVLoader(file_path=file_path, encoding="cp1252")
-#                 all_pages = loader.load_and_split()           
-
-#         elif file_extension == '.docx':
-#             loader = Docx2txtLoader(file_path)
-#             pages=loader.load_and_split()
-#             all_pages.extend(pages)
-
-#         elif file_extension == '.txt':
-#             loader= TextLoader(file_path=file_path)
-#             pages=loader.load_and_split()
-#             all_pages.extend(pages)
-
-
-#     embeddings = OpenAIEmbeddings()
-#     if index_name not in pinecone.list_indexes(): 
-#     # we create a new index
-#      pinecone.create_index(
-#         name=index_name,
-#         metric='cosine',
-#         dimension=1536  # 1536 dim of text-embedding-ada-002
-#     ) 
-#     Pinecone.from_documents(all_pages, embedding=embeddings,index_name=index_name)
-
-#     for file_path in all_files:
-#         os.remove(file_path)
-
-#     return jsonify({'message': 'files processed successfully'}), 200
 
 
 
@@ -341,4 +262,4 @@ def delete_index():
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
