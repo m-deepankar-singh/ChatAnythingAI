@@ -7,17 +7,23 @@ export default function FileUpload() {
   const [loading, setLoading] = useState(false);
   const [isFilesUploaded, setIsFilesUploaded] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const files = Array.from(e.target.files).filter(file => {
+      const files = Array.from(e.target.files).filter((file) => {
         const fileExtension = file.name.split(".").pop()?.toLowerCase();
-        return fileExtension === "pdf" || fileExtension === "csv" || fileExtension === "docx" || fileExtension === "txt";
+        return (
+          fileExtension === "pdf" ||
+          fileExtension === "csv" ||
+          fileExtension === "docx" ||
+          fileExtension === "txt"
+        );
       });
       setSelectedFiles((prevFiles) => [...prevFiles, ...files]);
     }
   };
-    const uploadFiles = async () => {
+  const uploadFiles = async () => {
     setLoading(true);
     const data = new FormData();
     selectedFiles.forEach((file) => {
@@ -33,6 +39,7 @@ export default function FileUpload() {
       setIsFilesUploaded(true);
     } catch (error) {
       console.log(error);
+      setMessage("Failed to upload files");
     }
     setLoading(false);
   };
@@ -41,10 +48,13 @@ export default function FileUpload() {
     setLoading(true);
     setIsProcessing(true);
     try {
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_BACKEND_URL}/process`);
+      const response = await axios.get(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/process`
+      );
       console.log(response.data);
     } catch (error) {
       console.log(error);
+      setMessage("Failed to process files");
     }
     setLoading(false);
     setIsProcessing(false);

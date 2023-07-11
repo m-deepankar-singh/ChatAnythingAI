@@ -1,152 +1,161 @@
+import os
 import shutil
 import tempfile
+import glob
+from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
-import os
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.document_loaders import PyPDFLoader
-from langchain.document_loaders.csv_loader import CSVLoader
-from langchain.document_loaders import WebBaseLoader
-from langchain.document_loaders import GitLoader
-from langchain.document_loaders import Docx2txtLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.document_loaders import YoutubeLoader
-import glob
-import pinecone
-from langchain.vectorstores import Pinecone
-from dotenv import load_dotenv
-from langchain.document_loaders import TextLoader
 from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
 from azure.core.exceptions import AzureError
+import pinecone
+from multiprocessing import Pool
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.document_loaders import (
+    PyPDFLoader,
+    CSVLoader,
+    WebBaseLoader,
+    GitLoader,
+    Docx2txtLoader,
+    TextLoader,
+    YoutubeLoader,
+)
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.vectorstores import Pinecone
+
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-uploaded_files = []
+PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+PINECONE_ENV = os.getenv("PINECONE_ENV")
+from supabase import create_client, Client
 
-connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
-container=os.getenv("CONTAINER_NAME")
-
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+SUPABASE_BUCKET = "pdf"
 index_name="pdf"
+PINECONE_DIMENSION = 1536  # 1536 dim of text-embedding-ada-002
 
 pinecone.init(
-    api_key=os.getenv("PINECONE_API_KEY"),
-    environment=os.getenv("PINECONE_ENV")
+    api_key=PINECONE_API_KEY,
+    environment=PINECONE_ENV
 )
 
+def create_pinecone_index(name, dimension):
+    if name not in pinecone.list_indexes(): 
+        pinecone.create_index(
+            name=name,
+            metric='cosine',
+            dimension=dimension
+        )
+
+import time
+
+def upload_files_to_supabase(uploaded_files):
+    filenames = []
+    for file in uploaded_files:
+        filename = secure_filename(file.filename)
+        temp_file_path = os.path.join(tempfile.gettempdir(), filename)
+        file.save(temp_file_path)
+        with open(temp_file_path, 'rb') as f:
+            res = supabase.storage.from_(SUPABASE_BUCKET).upload(filename, f)
+            if res.status_code != 200:
+                print(f"Error uploading {filename}: {res.body}")
+            else:
+                filenames.append(filename)
+        os.remove(temp_file_path)
+        time.sleep(1)  # wait for 1 second before next upload
+        
+    return filenames
+
+def process_file(file_path):
+    file_extension = os.path.splitext(file_path)[-1].lower()
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    if file_extension == '.pdf':
+        loader = PyPDFLoader(file_path)
+        pages = loader.load_and_split(text_splitter=text_splitter)
+    elif file_extension == '.csv':
+        try:
+            loader = CSVLoader(file_path=file_path, encoding="utf-8")
+            pages = loader.load_and_split()
+        except:
+            loader = CSVLoader(file_path=file_path, encoding="cp1252")
+            pages = loader.load_and_split()
+    elif file_extension == '.docx':
+        loader = Docx2txtLoader(file_path)
+        pages = loader.load_and_split()
+    elif file_extension == '.txt':
+        loader = TextLoader(file_path=file_path)
+        pages = loader.load_and_split()
+    else:
+        pages = []
+    return pages
 
 
+def process_files_from_supabase():
+    # Create a temporary directory
+    temp_dir = tempfile.mkdtemp()
+
+    # Download files from Supabase Storage to the temp directory
+    res = supabase.storage.from_(SUPABASE_BUCKET).list()
+    for file_metadata in res:
+        filename = file_metadata['name']
+        download_file_path = os.path.join(temp_dir, filename)
+        with open(download_file_path, 'wb') as f:
+            res = supabase.storage.from_(SUPABASE_BUCKET).download(filename)
+            f.write(res)
+    
+    all_files = glob.glob(f"{temp_dir}/*")
+    if not all_files:
+        return None, {"error": "No files found in the documents directory"}, 400
+    
+    all_pages = []
+    for file_path in all_files:
+        pages = process_file(file_path)
+        all_pages.extend(pages)
+
+    embeddings = OpenAIEmbeddings()
+    create_pinecone_index(index_name, PINECONE_DIMENSION)
+    Pinecone.from_documents(all_pages, embedding=embeddings,index_name=index_name)
+
+    
+    
+    # Remove the temporary directory
+    shutil.rmtree(temp_dir)    
+    
+    return {'message': 'files processed successfully'}, 200
+# The remaining functions for URL, Git, and YouTube processing 
+# can be refactored in a similar manner as process_files_from_azure()
 
 @app.route("/uploadFile", methods=["POST"])
 def upload_file():
     if 'files[]' not in request.files:
         return "Please send a POST request with files", 400
 
-    blob_service_client = BlobServiceClient.from_connection_string(connection_string)
-    container_client = blob_service_client.get_container_client(container)
-    
-    filenames = []
     try:
         uploaded_files = request.files.getlist("files[]")
-        for file in uploaded_files:
-            filename = secure_filename(file.filename)
-            blob_client = container_client.get_blob_client(filename)
-            blob_client.upload_blob(file, overwrite=True)
-            filenames.append(filename)
-
+        filenames = upload_files_to_supabase(uploaded_files)
     except AzureError as e:
-        return jsonify({"error": "Azure Blob Storage Error: {}".format(e)}), 500
-
+        return jsonify({"error": "Supabase Storage Error: {}".format(e)}), 500
     except Exception as e:
         return jsonify({"error": "An error occurred: {}".format(e)}), 500
 
     return jsonify(filenames), 200
 
-
-
-
-
 @app.route('/process', methods=['GET'])
 def process_files():
-    # Initialize BlobServiceClient
-    blob_service_client = BlobServiceClient.from_connection_string(connection_string)
-    container_client = blob_service_client.get_container_client(container)
-
-     # Create a temporary directory
-    temp_dir = tempfile.mkdtemp()
-
-    # Download files from Azure Blob Storage to the temp directory
-    blob_list = container_client.list_blobs()
-    for blob in blob_list:
-        blob_client = container_client.get_blob_client(blob)
-        container_client = blob_service_client.get_container_client(container)
-        download_file_path = os.path.join(temp_dir, blob.name)
-        with open(download_file_path, "wb") as download_file:
-            download_file.write(blob_client.download_blob().readall())
-    
-    all_files = glob.glob(f"{temp_dir}/*")
-
-
-    if not all_files:
-        return jsonify({"error": "No files found in the documents directory"}), 400
-
-
-    all_pages = []
-    for file_path in all_files:
-        file_extension = os.path.splitext(file_path)[-1].lower()
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000,chunk_overlap=200)
-        if file_extension == '.pdf':
-            loader = PyPDFLoader(file_path)
-            pages = loader.load_and_split(text_splitter=text_splitter)
-            all_pages.extend(pages)
-
-        elif file_extension == '.csv':
-            try:
-                loader = CSVLoader(file_path=file_path, encoding="utf-8")
-                all_pages = loader.load_and_split()
-            except:
-                loader = CSVLoader(file_path=file_path, encoding="cp1252")
-                all_pages = loader.load_and_split()           
-
-        elif file_extension == '.docx':
-            loader = Docx2txtLoader(file_path)
-            pages=loader.load_and_split()
-            all_pages.extend(pages)
-
-        elif file_extension == '.txt':
-            loader= TextLoader(file_path=file_path)
-            pages=loader.load_and_split()
-            all_pages.extend(pages)
-
-
-    embeddings = OpenAIEmbeddings()
-    if index_name not in pinecone.list_indexes(): 
-    # we create a new index
-     pinecone.create_index(
-        name=index_name,
-        metric='cosine',
-        dimension=1536  # 1536 dim of text-embedding-ada-002
-    ) 
-    Pinecone.from_documents(all_pages, embedding=embeddings,index_name=index_name)
-
-    blobList=[*container_client.list_blobs()]
-    while len(blobList) > 0:
-        first256 = blobList[0:255]
-        print("deleting " + str(len(first256)) + " of " + str(len(blobList)) + " blobs.")
-        container_client.delete_blobs(*first256)     # delete_blobs() is faster!
-        del blobList[0:255]
-
-        
-    # Remove the temporary directory
-    shutil.rmtree(temp_dir)    
-    return jsonify({'message': 'files processed successfully'}), 200
+    return process_files_from_supabase()
 
 
 
-
-
+def process_url(url):
+    loader = WebBaseLoader(web_path=url)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    url_pages = loader.load_and_split(text_splitter=text_splitter)
+    return url_pages
 
 @app.route('/url', methods=['POST'])
 def process_urls():
@@ -157,21 +166,13 @@ def process_urls():
         return jsonify({"error": "No URLs provided"}), 400
 
     all_pages = []
-
-    # Load pages from URLs
-    loader = WebBaseLoader(web_path=urls)
-    # loader.requests_kwargs = {'verify':True}
-    url_pages = loader.load_and_split()
-    all_pages.extend(url_pages)
+    with Pool() as pool:
+        url_pages = pool.map(process_url, urls)
+    for pages in url_pages:
+        all_pages.extend(pages)
 
     embeddings = OpenAIEmbeddings()
-    if index_name not in pinecone.list_indexes(): 
-        # we create a new index
-        pinecone.create_index(
-            name=index_name,
-            metric='cosine',
-            dimension=1536  # 1536 dim of text-embedding-ada-002
-        ) 
+    create_pinecone_index(index_name, PINECONE_DIMENSION)
     Pinecone.from_documents(all_pages, embedding=embeddings, index_name=index_name)
 
     return jsonify({'message': 'URLs processed successfully'}), 200
@@ -194,19 +195,19 @@ def process_git():
         url_pages = loader.load_and_split(text_splitter=text_splitter)
         all_pages.extend(url_pages)
 
-        # Get Blob service client
-        blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+        # # Get Blob service client
+        # blob_service_client = BlobServiceClient.from_connection_string(connection_string)
 
-        # Name of the Blob container in your storage
-        container_name = container
+        # # Name of the Blob container in your storage
+        # container_name = container
 
-        # Upload repo directory to Blob storage
-        for root, dirs, files in os.walk(repo_path, topdown=False):
-            for name in files:
-                file_path = os.path.join(root, name)
-                blob_client = blob_service_client.get_blob_client(container_name, file_path)
-                with open(file_path, "rb") as data:
-                    blob_client.upload_blob(data)
+        # # Upload repo directory to Blob storage
+        # for root, dirs, files in os.walk(repo_path, topdown=False):
+        #     for name in files:
+        #         file_path = os.path.join(root, name)
+        #         blob_client = blob_service_client.get_blob_client(container_name, file_path)
+        #         with open(file_path, "rb") as data:
+        #             blob_client.upload_blob(data)
 
         embeddings = OpenAIEmbeddings()
         if index_name not in pinecone.list_indexes(): 
@@ -257,9 +258,14 @@ def process_youtube():
 def delete_index():
     index = pinecone.Index(index_name)
     index.delete(delete_all='true')
-    return jsonify({'message': 'Pinecone index deleted successfully'}), 200
+    # Delete files from Supabase Storage
+    res = supabase.storage.from_(SUPABASE_BUCKET).list()
+    for file_metadata in res:
+        filename = file_metadata['name']
+        res = supabase.storage.from_(SUPABASE_BUCKET).remove(filename)
+    return jsonify({'message': 'Pinecone  and files deleted successfully'}), 200
 
 
 
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=True)

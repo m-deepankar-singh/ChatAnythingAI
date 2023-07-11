@@ -9,17 +9,9 @@ import {
 } from "langchain/schema";
 import { NextResponse } from "next/server";
 import { ConversationalRetrievalQAChain } from "langchain/chains";
-import {
-  ChatPromptTemplate,
-  HumanMessagePromptTemplate,
-  MessagesPlaceholder,
-  SystemMessagePromptTemplate,
-} from "langchain/prompts";
 import { PineconeClient } from "@pinecone-database/pinecone";
 import { PineconeStore } from "langchain/vectorstores/pinecone";
 import { OpenAIEmbeddings } from "langchain/embeddings/openai";
-
-
 
 export const runtime = "edge";
 
@@ -50,6 +42,7 @@ export async function POST(req: Request) {
   const writer = stream.writable.getWriter();
   let counter = 0;
   let string = "";
+  
   const chat = new ChatOpenAI({
     modelName: model,
     temperature: 0,
@@ -81,12 +74,8 @@ export async function POST(req: Request) {
     returnMessages: true,
     memoryKey: "history",
   });
-
-  const chatPrompt = ChatPromptTemplate.fromPromptMessages([
-    SystemMessagePromptTemplate.fromTemplate("You are a friendly assistant."),
-    new MessagesPlaceholder("history"),
-    HumanMessagePromptTemplate.fromTemplate("{input}"),
-  ]);
+  
+  
 
   const client = new PineconeClient();
   await client.init({
@@ -101,14 +90,16 @@ export async function POST(req: Request) {
     }),
     { pineconeIndex }
   );
-  
 
   const chain = ConversationalRetrievalQAChain.fromLLM(
     chat,
     vectorStore.asRetriever(),
-  );
+  )
+   
   chain.call({
-    question,chat_history
+    question,
+    chat_history,
+    
   });
 
   return new NextResponse(stream.readable, {
@@ -117,4 +108,3 @@ export async function POST(req: Request) {
     },
   });
 }
-

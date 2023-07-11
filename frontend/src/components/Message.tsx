@@ -1,6 +1,12 @@
 "use client";
 import ReactMarkdown from "react-markdown";
+import { CodeComponent } from "react-markdown/lib/ast-to-react"
 import remarkGfm from "remark-gfm";
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { dracula } from 'react-syntax-highlighter/dist/esm/styles/prism';
+
+
+
 
 interface MessageProps {
   name: "human" | "ai" | "system";
@@ -34,6 +40,13 @@ function HumanMessage({ text }: { text: string }) {
   );
 }
 
+const CodeBlock: CodeComponent = ({inline, className, children}) => {
+  const match = /language-(\w+)/.exec(className || '');
+  return !inline && match
+    ? <SyntaxHighlighter style={dracula} language={match[1]} children={String(children).replace(/\n$/, '')} customStyle={{fontSize: '18px'}} />
+    : <code className={className}>{children}</code>;
+};
+
 function AIMessage({ text }: { text: string }) {
   return (
     <div className="flex items-start">
@@ -54,7 +67,7 @@ function AIMessage({ text }: { text: string }) {
         </svg>
       </div>
       <div className="bg-gray-800 px-4 w-full rounded-md min-h-[60px]">
-        <ReactMarkdown linkTarget="_blank" remarkPlugins={[remarkGfm]}>
+        <ReactMarkdown components={{code:CodeBlock}} linkTarget="_blank" remarkPlugins={[remarkGfm]}>
           {text}
         </ReactMarkdown>
       </div>
