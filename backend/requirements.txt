@@ -2,7 +2,6 @@ pinecone-client
 langchain
 python-dotenv
 pypdf
-azure-storage-blob
 docx2txt
 flask
 flask-cors
@@ -13,3 +12,4 @@ beautifulsoup4
 tiktoken
 GitPython
 pytube
+supabase

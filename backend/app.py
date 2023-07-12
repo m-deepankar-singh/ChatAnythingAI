@@ -6,8 +6,6 @@ from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
-from azure.storage.blob import BlobServiceClient, BlobClient, ContainerClient
-from azure.core.exceptions import AzureError
 import pinecone
 from multiprocessing import Pool
 from langchain.embeddings import OpenAIEmbeddings
@@ -138,8 +136,6 @@ def upload_file():
     try:
         uploaded_files = request.files.getlist("files[]")
         filenames = upload_files_to_supabase(uploaded_files)
-    except AzureError as e:
-        return jsonify({"error": "Supabase Storage Error: {}".format(e)}), 500
     except Exception as e:
         return jsonify({"error": "An error occurred: {}".format(e)}), 500
 
@@ -263,7 +259,7 @@ def delete_index():
     for file_metadata in res:
         filename = file_metadata['name']
         res = supabase.storage.from_(SUPABASE_BUCKET).remove(filename)
-    return jsonify({'message': 'Pinecone  and files deleted successfully'}), 200
+    return jsonify({'message': 'Pinecone and files deleted successfully'}), 200
 
 
 
