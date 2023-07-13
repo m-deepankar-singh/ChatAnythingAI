@@ -13,6 +13,7 @@ import UrlProcessor from "@/components/url";
 import URLProcessor from "@/components/url";
 import { GitProcessor } from "@/components/git";
 import { YTProcessor } from "@/components/youtube";
+import { createClient } from '@supabase/supabase-js'
 
 Modal.setAppElement("#root");
 
@@ -121,6 +122,8 @@ export default function Home() {
   const [model, setModel] = useState("gpt-3.5-turbo");
   const [isModelSelectDisabled, setIsModelSelectDisabled] = useState(false);
 
+
+
   const [state, dispatch] = useReducer(reducer, {
     messages: [],
     assistantThinking: false,
@@ -130,15 +133,15 @@ export default function Home() {
 
   const promptInput = useRef<HTMLTextAreaElement>(null);
 
-  const handleDeleteContext = async () => {
-    try {
-      await axios.delete(`${process.env.NEXT_PUBLIC_BACKEND_URL}/delete`);
-      alert("Context deleted successfully");
-      window.location.reload();
-    } catch (error) {
-      alert("Error deleting context");
-    }
-  };
+  // const handleDeleteContext = async () => {
+  //   try {
+  //     await axios.delete(`${process.env.NEXT_PUBLIC_BACKEND_URL}/delete`);
+  //     alert("Context deleted successfully");
+  //     window.location.reload();
+  //   } catch (error) {
+  //     alert("Error deleting context");
+  //   }
+  // };
 
   const handlePrompt = async () => {
     if (promptInput && promptInput.current) {
@@ -197,6 +200,31 @@ export default function Home() {
       promptInput.current.focus();
     }
   }, []);
+
+  const handleDeleteContext = async () => {
+    const privateKey = process.env.NEXT_PUBLIC_SUPABASE_KEY;
+    if (!privateKey) throw new Error(`Expected env var SUPABASE_KEY`);
+  
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    if (!url) throw new Error(`Expected env var SUPABASE_URL`);
+
+    const table=process.env.NEXT_PUBLIC_SUPABASE_TABLE
+    if (!table) throw new Error(`Expected env var SUPABASE_TABLE`);
+
+  
+    const supabase = createClient(url, privateKey)
+    const { data, error } = await supabase
+        .from(table)
+        .delete()
+        .neq('id',0)
+
+    await axios.delete(`${process.env.NEXT_PUBLIC_BACKEND_URL}/delete`);
+  
+    if (error) alert('Error deleting context')
+    else alert('Context deleted successfully')
+    window.location.reload();
+    }
+  
 
   return (
     <div className="flex h-full relative flex-1 flex-col">

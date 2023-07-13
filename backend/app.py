@@ -20,6 +20,7 @@ from langchain.document_loaders import (
 )
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import Pinecone
+from langchain.vectorstores import SupabaseVectorStore
 
 load_dotenv()
 
@@ -116,8 +117,9 @@ def process_files_from_supabase():
         all_pages.extend(pages)
 
     embeddings = OpenAIEmbeddings()
-    create_pinecone_index(index_name, PINECONE_DIMENSION)
-    Pinecone.from_documents(all_pages, embedding=embeddings,index_name=index_name)
+    # create_pinecone_index(index_name, PINECONE_DIMENSION)
+    # Pinecone.from_documents(all_pages, embedding=embeddings,index_name=index_name)
+    SupabaseVectorStore.from_documents(all_pages, embedding=embeddings, client=supabase)
 
     
     
@@ -252,8 +254,6 @@ def process_youtube():
 
 @app.route('/delete', methods=['DELETE'])
 def delete_index():
-    index = pinecone.Index(index_name)
-    index.delete(delete_all='true')
     # Delete files from Supabase Storage
     res = supabase.storage.from_(SUPABASE_BUCKET).list()
     for file_metadata in res:

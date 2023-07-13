@@ -11,9 +11,13 @@ import { NextResponse } from "next/server";
 import { ConversationalRetrievalQAChain } from "langchain/chains";
 import { PineconeClient } from "@pinecone-database/pinecone";
 import { PineconeStore } from "langchain/vectorstores/pinecone";
+import { SupabaseVectorStore } from "langchain/vectorstores/supabase";
+import { createClient } from "@supabase/supabase-js";
 import { OpenAIEmbeddings } from "langchain/embeddings/openai";
 
 export const runtime = "edge";
+
+
 
 function mapStoredMessagesToChatMessages(
   messages: BaseChatMessage[]
@@ -40,6 +44,7 @@ export async function POST(req: Request) {
   const encoder = new TextEncoder();
   const stream = new TransformStream();
   const writer = stream.writable.getWriter();
+  
   let counter = 0;
   let string = "";
   
@@ -76,20 +81,42 @@ export async function POST(req: Request) {
   });
   
   
+  const privateKey = process.env.SUPABASE_KEY;
+  if (!privateKey) throw new Error(`Expected env var SUPABASE_PRIVATE_KEY`);
 
-  const client = new PineconeClient();
-  await client.init({
-    apiKey: process.env.PINECONE_API_KEY || "",
-    environment: process.env.PINECONE_ENV || "",
-  });
-  const pineconeIndex = client.Index(process.env.PINECONE_INDEX || "");
+  const url = process.env.SUPABASE_URL;
+  if (!url) throw new Error(`Expected env var SUPABASE_URL`);
 
-  const vectorStore = await PineconeStore.fromExistingIndex(
-    new OpenAIEmbeddings({
-      openAIApiKey: process.env.OPENAI_API_KEY,
-    }),
-    { pineconeIndex }
-  );
+  const client = createClient(url, privateKey,{
+    auth:{
+      persistSession:false
+    }
+  },);
+
+  const supabase_table=process.env.SUPABASE_TABLE || "";
+
+  const vectorStore = await SupabaseVectorStore.fromExistingIndex(
+    new OpenAIEmbeddings(),
+    {
+      client,
+      tableName: supabase_table  || "",
+
+    }
+  )
+
+  // const client = new PineconeClient();
+  // await client.init({
+  //   apiKey: process.env.PINECONE_API_KEY || "",
+  //   environment: process.env.PINECONE_ENV || "",
+  // });
+  // const pineconeIndex = client.Index(process.env.PINECONE_INDEX || "");
+
+  // const vectorStore = await PineconeStore.fromExistingIndex(
+  //   new OpenAIEmbeddings({
+  //     openAIApiKey: process.env.OPENAI_API_KEY,
+  //   }),
+  //   { pineconeIndex }
+  // );
 
   const chain = ConversationalRetrievalQAChain.fromLLM(
     chat,
