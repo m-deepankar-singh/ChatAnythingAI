@@ -36,22 +36,6 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 SUPABASE_BUCKET = "pdf"
 index_name="pdf"
-PINECONE_DIMENSION = 1536  # 1536 dim of text-embedding-ada-002
-
-pinecone.init(
-    api_key=PINECONE_API_KEY,
-    environment=PINECONE_ENV
-)
-
-def create_pinecone_index(name, dimension):
-    if name not in pinecone.list_indexes(): 
-        pinecone.create_index(
-            name=name,
-            metric='cosine',
-            dimension=dimension
-        )
-
-import time
 
 def upload_files_to_supabase(uploaded_files):
     filenames = []
@@ -66,7 +50,6 @@ def upload_files_to_supabase(uploaded_files):
             else:
                 filenames.append(filename)
         os.remove(temp_file_path)
-        time.sleep(1)  # wait for 1 second before next upload
         
     return filenames
 
@@ -117,18 +100,12 @@ def process_files_from_supabase():
         all_pages.extend(pages)
 
     embeddings = OpenAIEmbeddings()
-    # create_pinecone_index(index_name, PINECONE_DIMENSION)
-    # Pinecone.from_documents(all_pages, embedding=embeddings,index_name=index_name)
     SupabaseVectorStore.from_documents(all_pages, embedding=embeddings, client=supabase)
 
-    
-    
     # Remove the temporary directory
     shutil.rmtree(temp_dir)    
     
     return {'message': 'files processed successfully'}, 200
-# The remaining functions for URL, Git, and YouTube processing 
-# can be refactored in a similar manner as process_files_from_azure()
 
 @app.route("/uploadFile", methods=["POST"])
 def upload_file():
@@ -170,8 +147,7 @@ def process_urls():
         all_pages.extend(pages)
 
     embeddings = OpenAIEmbeddings()
-    create_pinecone_index(index_name, PINECONE_DIMENSION)
-    Pinecone.from_documents(all_pages, embedding=embeddings, index_name=index_name)
+    SupabaseVectorStore.from_documents(all_pages, embedding=embeddings, client=supabase)
 
     return jsonify({'message': 'URLs processed successfully'}), 200
 
@@ -208,14 +184,7 @@ def process_git():
         #             blob_client.upload_blob(data)
 
         embeddings = OpenAIEmbeddings()
-        if index_name not in pinecone.list_indexes(): 
-            # we create a new index
-            pinecone.create_index(
-                name=index_name,
-                metric='cosine',
-                dimension=1536  # 1536 dim of text-embedding-ada-002
-            ) 
-        Pinecone.from_documents(all_pages, embedding=embeddings, index_name=index_name)
+    SupabaseVectorStore.from_documents(all_pages, embedding=embeddings, client=supabase)
 
     # No need to manually delete files in the temporary directory, as it gets removed automatically
 
@@ -239,14 +208,7 @@ def process_youtube():
     all_pages.extend(url_pages)
 
     embeddings = OpenAIEmbeddings()
-    if index_name not in pinecone.list_indexes(): 
-        # we create a new index
-        pinecone.create_index(
-            name=index_name,
-            metric='cosine',
-            dimension=1536  # 1536 dim of text-embedding-ada-002
-        ) 
-    Pinecone.from_documents(all_pages, embedding=embeddings, index_name=index_name)
+    SupabaseVectorStore.from_documents(all_pages, embedding=embeddings, client=supabase)
 
     return jsonify({'message': 'Transcript processed successfully'}), 200
 
